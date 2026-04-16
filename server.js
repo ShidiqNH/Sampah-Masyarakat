@@ -2,15 +2,46 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
+const multerS3 = require('multer-s3');
+const { S3Client } = require('@aws-sdk/client-s3');
 const pool = require('./config/db');
 
 const app = express();
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'public/uploads/'),
-    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+// --- 1. KONFIGURASI AWS S3 CLIENT ---
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
 });
-const upload = multer({ storage: storage });
+
+// --- 2. VALIDASI FORMAT GAMBAR ---
+const imageFilter = (req, file, cb) => {
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+        return cb(new Error('Hanya file gambar yang diizinkan!'), false);
+    }
+    cb(null, true);
+};
+
+// --- 3. KONFIGURASI MULTER S3 (HANYA SATU SAJA) ---
+const upload = multer({
+    storage: multerS3({
+        s3: s3,
+        bucket: process.env.S3_BUCKET_NAME,
+        acl: 'public-read',
+        contentType: multerS3.AUTO_CONTENT_TYPE, // PENTING: Agar gambar tampil di browser
+        metadata: (req, file, cb) => {
+            cb(null, { fieldName: file.fieldname });
+        },
+        key: (req, file, cb) => {
+            cb(null, `uploads/${Date.now().toString()}-${file.originalname}`);
+        }
+    }),
+    fileFilter: imageFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // Batas 5MB
+});
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -19,7 +50,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 1. INDEX
+// --- ROUTES ---
+
 app.get('/', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
@@ -29,10 +61,9 @@ app.get('/', async (req, res) => {
     }
 });
 
-// 2. LAPOR
 app.post('/report', upload.single('image'), async (req, res) => {
     const { title, description, location, latitude, longitude } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const imageUrl = req.file ? req.file.location : null; // URL S3
 
     try {
         const sql = `INSERT INTO reports (title, description, location_name, latitude, longitude, image_url) VALUES (?, ?, ?, ?, ?, ?)`;
@@ -40,11 +71,10 @@ app.post('/report', upload.single('image'), async (req, res) => {
         res.redirect('/');
     } catch (err) {
         console.error(err);
-        res.status(500).send("Simpan Gagal");
+        res.status(500).send("Simpan Gagal. Cek Kredensial AWS.");
     }
 });
 
-// 3. DASHBOARD MAP
 app.get('/reports', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM reports');
@@ -54,7 +84,6 @@ app.get('/reports', async (req, res) => {
     }
 });
 
-// 4. DETAIL
 app.get('/reports/:id', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM reports WHERE id = ?', [req.params.id]);
@@ -65,14 +94,14 @@ app.get('/reports/:id', async (req, res) => {
     }
 });
 
-// 5. VERIFIKASI
 app.post('/reports/:id/verify', upload.single('evidence'), async (req, res) => {
-    const evidenceUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const evidenceUrl = req.file ? req.file.location : null;
     try {
         await pool.query('UPDATE reports SET status = ?, evidence_url = ? WHERE id = ?', 
         ['Selesai', evidenceUrl, req.params.id]);
         res.redirect(`/reports/${req.params.id}`);
     } catch (err) {
+        console.error(err);
         res.status(500).send("Update Gagal");
     }
 });

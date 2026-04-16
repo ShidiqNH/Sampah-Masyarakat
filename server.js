@@ -1,10 +1,9 @@
 require('dotenv').config();
-const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
-const { S3Client } = require('@aws-sdk/client-s3');
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const pool = require('./config/db');
 
 const app = express();
@@ -26,13 +25,13 @@ const imageFilter = (req, file, cb) => {
     cb(null, true);
 };
 
-// --- 3. KONFIGURASI MULTER S3 (HANYA SATU SAJA) ---
+// --- 3. KONFIGURASI MULTER S3 ---
 const upload = multer({
     storage: multerS3({
         s3: s3,
         bucket: process.env.S3_BUCKET_NAME,
         acl: 'public-read',
-        contentType: multerS3.AUTO_CONTENT_TYPE, // PENTING: Agar gambar tampil di browser
+        contentType: multerS3.AUTO_CONTENT_TYPE,
         metadata: (req, file, cb) => {
             cb(null, { fieldName: file.fieldname });
         },
@@ -41,7 +40,7 @@ const upload = multer({
         }
     }),
     fileFilter: imageFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // Batas 5MB
+    limits: { fileSize: 10 * 1024 * 1024 } // Dinaikkan ke 10MB biar aman
 });
 
 app.set('view engine', 'ejs');
@@ -51,7 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- ROUTES ---
+// --- 4. ROUTES ---
 
 app.get('/', async (req, res) => {
     try {
@@ -64,7 +63,7 @@ app.get('/', async (req, res) => {
 
 app.post('/report', upload.single('image'), async (req, res) => {
     const { title, description, location, latitude, longitude } = req.body;
-    const imageUrl = req.file ? req.file.location : null; // URL S3
+    const imageUrl = req.file ? req.file.location : null;
 
     try {
         const sql = `INSERT INTO reports (title, description, location_name, latitude, longitude, image_url) VALUES (?, ?, ?, ?, ?, ?)`;
@@ -72,7 +71,7 @@ app.post('/report', upload.single('image'), async (req, res) => {
         res.redirect('/');
     } catch (err) {
         console.error(err);
-        res.status(500).send("Simpan Gagal. Cek Kredensial AWS.");
+        res.status(500).send("Simpan Gagal");
     }
 });
 
@@ -106,20 +105,15 @@ app.post('/reports/:id/verify', upload.single('evidence'), async (req, res) => {
         res.status(500).send("Update Gagal");
     }
 });
-app.listen(80, () => console.log(' Jalan di port 80'));
 
-// --- 6. HAPUS LAPORAN & FILE DI S3 ---
+// --- 5. HAPUS LAPORAN & FILE DI S3 (Pindahkan ke sini sebelum app.listen) ---
 app.post('/reports/:id/delete', async (req, res) => {
     const reportId = req.params.id;
-
     try {
-        // 1. Ambil data laporan dari DB untuk mendapatkan URL gambar
         const [rows] = await pool.query('SELECT image_url, evidence_url FROM reports WHERE id = ?', [reportId]);
         
         if (rows.length > 0) {
             const report = rows[0];
-
-            // Fungsi pembantu untuk mengambil "Key" (nama file) dari URL S3
             const getS3Key = (url) => {
                 if (!url) return null;
                 const parts = url.split('.com/');
@@ -129,9 +123,8 @@ app.post('/reports/:id/delete', async (req, res) => {
             const keysToDelete = [
                 getS3Key(report.image_url),
                 getS3Key(report.evidence_url)
-            ].filter(key => key !== null); // Hanya ambil yang ada isinya
+            ].filter(key => key !== null);
 
-            // 2. Hapus file dari S3 satu per satu
             for (const key of keysToDelete) {
                 const deleteParams = {
                     Bucket: process.env.S3_BUCKET_NAME,
@@ -146,12 +139,4 @@ app.post('/reports/:id/delete', async (req, res) => {
             }
         }
 
-        // 3. Hapus record dari database
-        await pool.query('DELETE FROM reports WHERE id = ?', [reportId]);
-        
-        res.redirect('/');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Gagal menghapus laporan sepenuhnya.");
-    }
-});
+        await pool.query('DELETE FROM reports WHERE id = ?

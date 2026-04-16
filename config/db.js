@@ -1,21 +1,18 @@
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
-    password: process.env.DB_PASS,
+    password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    // Penting untuk RDS agar tidak timeout
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
 });
 
-// Gunakan promise wrapper agar bisa pakai async/await
-const promisePool = pool.promise();
-
-promisePool.getConnection()
-    .then(() => console.log('✅ Terhubung ke MySQL Laragon (db: sampah)'))
-    .catch(err => console.error('❌ Gagal koneksi MySQL:', err));
-
-module.exports = promisePool;
+module.exports = pool;

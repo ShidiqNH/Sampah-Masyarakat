@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CleanCity - Lapor Sampah</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --primary: #059669; --bg: #f8fafc; }
+        body { background: var(--bg); font-family: 'Inter', sans-serif; }
+        .navbar { background: white; border-bottom: 1px solid #e2e8f0; }
+        .card-form { border: none; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 15px; padding: 1.5rem; cursor: pointer; background: #f1f5f9; transition: 0.3s; }
+        .upload-zone:hover { border-color: var(--primary); background: #ecfdf5; }
+        .report-card { border-radius: 20px; overflow: hidden; border: none; transition: 0.3s; background: white; }
+        .report-card:hover { transform: translateY(-5px); box-shadow: 0 12px 20px rgba(0,0,0,0.1); }
+        .img-box { height: 180px; overflow: hidden; position: relative; }
+        .img-box img { width: 100%; height: 100%; object-fit: cover; }
+        .status-badge { position: absolute; top: 10px; right: 10px; background: white; padding: 4px 12px; border-radius: 50px; font-size: 0.7rem; font-weight: 700; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-map { border-radius: 12px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="/"><i class="bi bi-leaf-fill me-2"></i>CleanCity</a>
+        <a href="/reports" class="btn btn-outline-success btn-map px-4">
+            <i class="bi bi-map-fill me-2"></i>Lihat Peta
+        </a>
+    </div>
+</nav>
+
+<div class="container my-5">
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card card-form p-4 sticky-top" style="top: 100px;">
+                <h4 class="fw-bold mb-4">Lapor Sampah</h4>
+                <form action="/report" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="imageInput" class="upload-zone w-100 text-center d-block">
+                            <i class="bi bi-camera-fill h3 text-secondary"></i>
+                            <p class="mb-0 small fw-bold" id="fileName">Ambil Foto / Upload</p>
+                        </label>
+                        <input type="file" name="image" id="imageInput" accept="image/*" capture="environment" class="d-none" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Subjek</label>
+                        <input type="text" name="title" class="form-control bg-light border-0 p-3" placeholder="Apa yang Anda lihat?" required style="border-radius:12px;">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase">Detail (Opsional)</label>
+                        <textarea name="description" class="form-control bg-light border-0 p-3" rows="2" placeholder="Detail tambahan..." style="border-radius:12px; font-size: 0.9rem;"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-uppercase">Lokasi Sekarang</label>
+                        <div class="position-relative">
+                            <textarea id="locDisplay" name="location" class="form-control bg-light border-0 p-3 pe-5" rows="2" readonly style="border-radius:12px; font-size: 0.85rem; resize: none;" required></textarea>
+                            <div id="loader" class="spinner-border spinner-border-sm text-success position-absolute" style="right: 15px; top: 15px;" role="status"></div>
+                        </div>
+                        <input type="hidden" name="latitude" id="lat">
+                        <input type="hidden" name="longitude" id="lng">
+                    </div>
+
+                    <button type="submit" id="btnSubmit" class="btn btn-success w-100 p-3 fw-bold shadow-sm" style="border-radius:12px;">Kirim Laporan</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="fw-bold m-0">Laporan Terkini</h3>
+                <span class="badge bg-white text-dark border px-3 py-2 rounded-pill shadow-sm"><%= reports.length %> Laporan</span>
+            </div>
+            
+            <div class="row g-3">
+                <% if (reports.length > 0) { %>
+                    <% reports.forEach(r => { %>
+                        <div class="col-md-6">
+                            <div class="card report-card shadow-sm h-100">
+                                <div class="img-box">
+                                    <span class="status-badge shadow-sm"><%= r.status %></span>
+                                    <img src="<%= r.image_url %>" alt="report">
+                                </div>
+                                <div class="card-body p-4">
+                                    <h6 class="fw-bold mb-2 text-truncate"><%= r.title %></h6>
+                                    <p class="text-muted mb-3" style="font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                        <i class="bi bi-geo-alt-fill text-danger me-1"></i> <%= r.location_name %>
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center mt-auto border-top pt-2">
+                                        <small class="text-secondary"><%= new Date(r.created_at).toLocaleDateString('id-ID') %></small>
+                                        <a href="/reports/<%= r.id %>" class="btn btn-sm btn-link text-success fw-bold text-decoration-none">Detail <i class="bi bi-chevron-right"></i></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="col-12">
+                        <div class="text-center py-5 bg-white rounded-4 shadow-sm">
+                            <i class="bi bi-check-circle text-success display-4"></i>
+                            <p class="text-muted mt-2">Belum ada laporan. Lingkungan Anda bersih!</p>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update nama file saat dipilih
+    document.getElementById('imageInput').onchange = function() {
+        if (this.files && this.files[0]) {
+            document.getElementById('fileName').innerText = this.files[0].name;
+            document.getElementById('fileName').classList.add('text-success');
+        }
+    };
+
+    // Fungsi mendapatkan Alamat dari Koordinat
+    async function getAddress(lat, lng) {
+        const display = document.getElementById('locDisplay');
+        const loader = document.getElementById('loader');
+        
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const data = await response.json();
+            display.value = data.display_name || `Koordinat: ${lat}, ${lng}`;
+        } catch (error) {
+            display.value = `${lat}, ${lng}`;
+        } finally {
+            loader.classList.add('d-none');
+            document.getElementById('btnSubmit').disabled = false;
+        }
+    }
+
+    // GPS Logic
+    window.onload = () => {
+        const btn = document.getElementById('btnSubmit');
+        const display = document.getElementById('locDisplay');
+        
+        btn.disabled = true;
+        display.value = "Mencari alamat Anda...";
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    document.getElementById('lat').value = lat;
+                    document.getElementById('lng').value = lng;
+                    getAddress(lat, lng);
+                },
+                (err) => {
+                    display.value = "GPS tidak aktif. Mohon izinkan lokasi.";
+                    document.getElementById('loader').classList.add('d-none');
+                    btn.disabled = false;
+                    btn.innerText = "Kirim Tanpa Lokasi";
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            display.value = "Browser tidak mendukung GPS";
+        }
+    };
+</script>
+</body>
+</html>

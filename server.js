@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -107,15 +108,50 @@ app.post('/reports/:id/verify', upload.single('evidence'), async (req, res) => {
 });
 app.listen(80, () => console.log(' Jalan di port 80'));
 
-// --- 6. HAPUS LAPORAN ---
+// --- 6. HAPUS LAPORAN & FILE DI S3 ---
 app.post('/reports/:id/delete', async (req, res) => {
+    const reportId = req.params.id;
+
     try {
-        // (Opsional) Jika ingin menghapus file di S3 juga, kamu butuh DeleteObjectCommand dari AWS SDK.
-        // Untuk sekarang, kita hapus record dari database saja.
-        await pool.query('DELETE FROM reports WHERE id = ?', [req.params.id]);
+        // 1. Ambil data laporan dari DB untuk mendapatkan URL gambar
+        const [rows] = await pool.query('SELECT image_url, evidence_url FROM reports WHERE id = ?', [reportId]);
+        
+        if (rows.length > 0) {
+            const report = rows[0];
+
+            // Fungsi pembantu untuk mengambil "Key" (nama file) dari URL S3
+            const getS3Key = (url) => {
+                if (!url) return null;
+                const parts = url.split('.com/');
+                return parts.length > 1 ? parts[1] : null;
+            };
+
+            const keysToDelete = [
+                getS3Key(report.image_url),
+                getS3Key(report.evidence_url)
+            ].filter(key => key !== null); // Hanya ambil yang ada isinya
+
+            // 2. Hapus file dari S3 satu per satu
+            for (const key of keysToDelete) {
+                const deleteParams = {
+                    Bucket: process.env.S3_BUCKET_NAME,
+                    Key: key,
+                };
+                try {
+                    await s3.send(new DeleteObjectCommand(deleteParams));
+                    console.log(`Berhasil hapus dari S3: ${key}`);
+                } catch (s3Err) {
+                    console.error(`Gagal hapus file S3 (${key}):`, s3Err);
+                }
+            }
+        }
+
+        // 3. Hapus record dari database
+        await pool.query('DELETE FROM reports WHERE id = ?', [reportId]);
+        
         res.redirect('/');
     } catch (err) {
         console.error(err);
-        res.status(500).send("Gagal menghapus laporan.");
+        res.status(500).send("Gagal menghapus laporan sepenuhnya.");
     }
 });

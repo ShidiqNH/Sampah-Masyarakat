@@ -33,20 +33,20 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Login ke docker di EC2
+          # 1. Login ke Docker Hub di EC2
           echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
           
-          # Pull image yang benar: sampah-masyarakat
+          # 2. Pull image terbaru
           sudo docker pull ${{ secrets.DOCKER_USERNAME }}/sampah-masyarakat:latest
           
-          # Hentikan container lama (pakai nama yang konsisten)
+          # 3. Hentikan container lama jika ada
           sudo docker stop app-sampah || true
           sudo docker rm app-sampah || true
           
-          # Jalankan container baru
+          # 4. JALANKAN CONTAINER (Mapping port ke 3000 agar tidak bentrok dengan Nginx)
           sudo docker run -d \
             --name app-sampah \
-            -p 80:80 \
+            -p 3000:80 \
             --restart unless-stopped \
             -e DB_HOST="${{ secrets.DB_HOST }}" \
             -e DB_USER="${{ secrets.DB_USER }}" \
@@ -58,5 +58,5 @@ jobs:
             -e S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" \
             ${{ secrets.DOCKER_USERNAME }}/sampah-masyarakat:latest
           
-          # Bersihkan sisa image lama agar disk EC2 tidak penuh
+          # 5. Bersihkan image lama
           sudo docker image prune -f

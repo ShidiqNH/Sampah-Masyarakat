@@ -113,19 +113,23 @@
 </div>
 
 <script>
-    // Update nama file saat dipilih
     document.getElementById('imageInput').onchange = function() {
         if (this.files && this.files[0]) {
-            document.getElementById('fileName').innerText = this.files[0].name;
+            const file = this.files[0];
+            // Tambahan validasi di JS (opsional)
+            if(!file.type.startsWith('image/')){
+                alert("Mohon upload file gambar!");
+                this.value = "";
+                return;
+            }
+            document.getElementById('fileName').innerText = file.name;
             document.getElementById('fileName').classList.add('text-success');
         }
     };
 
-    // Fungsi mendapatkan Alamat dari Koordinat
     async function getAddress(lat, lng) {
         const display = document.getElementById('locDisplay');
         const loader = document.getElementById('loader');
-        
         try {
             const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
             const data = await response.json();
@@ -138,11 +142,9 @@
         }
     }
 
-    // GPS Logic
     window.onload = () => {
         const btn = document.getElementById('btnSubmit');
         const display = document.getElementById('locDisplay');
-        
         btn.disabled = true;
         display.value = "Mencari alamat Anda...";
 
@@ -163,8 +165,6 @@
                 },
                 { enableHighAccuracy: true }
             );
-        } else {
-            display.value = "Browser tidak mendukung GPS";
         }
     };
 </script>

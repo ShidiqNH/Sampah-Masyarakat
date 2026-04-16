@@ -105,5 +105,4 @@ app.post('/reports/:id/verify', upload.single('evidence'), async (req, res) => {
         res.status(500).send("Update Gagal");
     }
 });
-
-app.listen(3000, () => console.log('🚀 Web Jalan di http://localhost:3000'));
+app.listen(80, () => console.log(' Jalan di port 80'));

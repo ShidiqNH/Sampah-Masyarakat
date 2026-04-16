@@ -139,4 +139,15 @@ app.post('/reports/:id/delete', async (req, res) => {
             }
         }
 
-        await pool.query('DELETE FROM reports WHERE id = ?
+        // 3. Hapus record dari database (Pastikan baris ini lengkap)
+        await pool.query('DELETE FROM reports WHERE id = ?', [reportId]);
+        
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Gagal menghapus laporan.");
+    }
+});
+
+// Port diubah ke 80 karena di dalam container docker tetap 80
+app.listen(80, () => console.log('🚀 Server jalan di port 80'));

@@ -21,6 +21,8 @@
         .evidence-img { width: 100%; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
         .btn-maps { transition: 0.3s; font-weight: 600; }
         .btn-maps:hover { background-color: #4285F4; color: white; border-color: #4285F4; }
+        .btn-delete { transition: 0.3s; }
+        .btn-delete:hover { background-color: #dc3545; color: white; }
     </style>
 </head>
 <body>
@@ -30,6 +32,7 @@
         <a class="navbar-brand fw-bold text-success" href="/reports">
             <i class="bi bi-arrow-left me-2"></i>Kembali ke Peta
         </a>
+        <a href="/" class="btn btn-light btn-sm rounded-pill px-3 border">Ke Beranda</a>
     </div>
 </nav>
 
@@ -55,7 +58,7 @@
                             </p>
                             
                             <div class="mb-4">
-                                <a href="https://www.google.com/maps/search/?api=1&query=<%= report.latitude %>,<%= report.longitude %>" 
+                                <a href="https://www.google.com/maps?q=<%= report.latitude %>,<%= report.longitude %>" 
                                    target="_blank" 
                                    class="btn btn-outline-primary btn-sm btn-maps rounded-pill px-3 shadow-sm">
                                     <i class="bi bi-map-fill me-2"></i>Navigasi ke Lokasi
@@ -64,7 +67,13 @@
                         </div>
                         <div class="text-end">
                             <small class="text-secondary d-block">Dilaporkan pada :</small>
-                            <span class="fw-bold"><%= new Date(report.created_at).toLocaleDateString('id-ID') %></span>
+                            <span class="fw-bold d-block mb-3"><%= new Date(report.created_at).toLocaleDateString('id-ID') %></span>
+                            
+                            <form action="/reports/<%= report.id %>/delete" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus laporan ini? Data akan hilang permanen.');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 btn-delete">
+                                    <i class="bi bi-trash3 me-1"></i> Hapus
+                                </button>
+                            </form>
                         </div>
                     </div>
 
@@ -80,7 +89,7 @@
                             <div class="text-center mb-4">
                                 <i class="bi bi-patch-check-fill text-success display-4"></i>
                                 <h4 class="fw-bold mt-2">Panel Verifikasi Petugas</h4>
-                                <p class="text-muted">Gunakan bagian ini jika Anda telah membersihkan lokasi ini.</p>
+                                <p class="text-muted">Upload foto bukti jika lokasi ini sudah dibersihkan.</p>
                             </div>
                             
                             <form action="/reports/<%= report.id %>/verify" method="POST" enctype="multipart/form-data">

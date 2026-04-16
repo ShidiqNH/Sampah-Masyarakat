@@ -106,3 +106,16 @@ app.post('/reports/:id/verify', upload.single('evidence'), async (req, res) => {
     }
 });
 app.listen(80, () => console.log(' Jalan di port 80'));
+
+// --- 6. HAPUS LAPORAN ---
+app.post('/reports/:id/delete', async (req, res) => {
+    try {
+        // (Opsional) Jika ingin menghapus file di S3 juga, kamu butuh DeleteObjectCommand dari AWS SDK.
+        // Untuk sekarang, kita hapus record dari database saja.
+        await pool.query('DELETE FROM reports WHERE id = ?', [req.params.id]);
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Gagal menghapus laporan.");
+    }
+});
